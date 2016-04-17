@@ -52,8 +52,8 @@ let alreadyImported = ref ([] : string list)
 
 let rec process_command  cmd = match cmd with
   | Eval(fi,t) -> 
-      let t' = eval t in
-      printtm_ATerm true t'; 
+      let t' = eval initialContext t in
+      printtm initialContext t'; 
       force_newline();
       ()
   
@@ -66,9 +66,29 @@ let process_file f  =
     print_flush();
     results
   in
-    List.iter g  cmds
+  List.iter g  (match cmds with
+  | [] -> failwith "TODO"
+  | _ :: _ -> failwith "TODO")
 
 let main () = 
+(* (* manual test1 *)
+  let term = TmAbs(dummyinfo, "x", TmVar(dummyinfo, 0, 1)) in
+  let cmd = Eval(dummyinfo, term) in
+    process_command cmd
+*)
+(* (* manual test2 *)
+  let left = TmAbs(dummyinfo, "x", TmVar(dummyinfo, 0, 1)) in
+  let right = TmAbs(dummyinfo, "x", TmApp(dummyinfo, TmVar(dummyinfo, 0, 1), TmVar(dummyinfo, 0, 1))) in
+  let term = TmApp(dummyinfo, left, right) in
+  let cmd = Eval(dummyinfo, term) in
+    process_command cmd
+*)
+(* (* manual test3, try to change the TmVar(0, 2) to TmVar(1, 2) *)
+  let term = TmAbs(dummyinfo, "x", TmAbs(dummyinfo, "x", TmVar(dummyinfo, 1, 2))) in
+  let cmd = Eval(dummyinfo, term) in
+    process_command cmd
+*)
+
   let inFile = parseArgs() in
   let _ = process_file inFile  in
   ()

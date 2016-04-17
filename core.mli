@@ -6,4 +6,4 @@
 open Syntax
 open Support.Error
 
-val eval : term -> term 
+val eval : context -> term -> term 

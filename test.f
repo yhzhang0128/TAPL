@@ -6,3 +6,7 @@ if false then true else false;
 0; 
 succ (pred 0);
 iszero (pred (succ (succ 0))); 
+
+succ false;
+
+succ(succ (succ( iszero (succ 0) )));
