@@ -50,26 +50,30 @@ in
 
 let alreadyImported = ref ([] : string list)
 
-let rec process_command  cmd = match cmd with
+let rec process_command ctx cmd = match cmd with
   | Eval(fi,t) -> 
-      let t' = eval initialContext t in
-      printtm initialContext t'; 
+      let t' = eval ctx t in
+      printtm ctx t'; 
       force_newline();
-      ()
+      initialContext
   
-let process_file f  =
+let process_file f ctx =
   alreadyImported := f :: !alreadyImported;
-  let cmds = parseFile f in
-  let g  c =  
+  let (cmds,_) = parseFile f ctx in
+  let g ctx c =  
     open_hvbox 0;
-    let results = process_command  c in
+    let results = process_command ctx c in
     print_flush();
     results
   in
-  List.iter g  (match cmds with
-  | [] -> failwith "TODO"
-  | _ :: _ -> failwith "TODO")
+    List.fold_left g ctx cmds
 
+(*  List.iter g initialContext (match cmds with
+  | [] -> failwith "TODO1"
+  | _ -> cmds)*)
+(* Remark: do not understand this *)
+(*  | _ :: _ -> failwith "TODO2") *)
+                  
 let main () = 
 (* (* manual test1 *)
   let term = TmAbs(dummyinfo, "x", TmVar(dummyinfo, 0, 1)) in
@@ -90,7 +94,7 @@ let main () =
 *)
 
   let inFile = parseArgs() in
-  let _ = process_file inFile  in
+  let _ = process_file inFile initialContext in
   ()
 
 let () = set_max_boxes 1000

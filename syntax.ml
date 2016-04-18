@@ -36,6 +36,13 @@ let index2name fi ctx x =
   else
     error fi "index2name Fail"
 
+let rec name2index fi ctx x = 
+match ctx with
+   [] -> error fi ("Identifier " ^ x ^ " is unbound")
+| (y,_)::rest ->
+   if y=x then 0
+          else 1 + (name2index fi rest x)
+
 let ctxlength ctx = List.length ctx
 
 let rec pickfreshname ctx x =
@@ -44,7 +51,9 @@ let rec pickfreshname ctx x =
     else
       ((x, NameBind)::ctx), x
 
+let addbinding ctx x bind = (x,bind)::ctx
 
+let addname ctx x = addbinding ctx x NameBind
 (* ---------------------------------------------------------------------- *)
 
 (* Extracting file info *)

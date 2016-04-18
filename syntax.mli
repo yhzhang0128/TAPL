@@ -26,7 +26,10 @@ type binding = NameBind
 type context = (string * binding) list
 
 val initialContext: context
-
+val index2name: info -> context -> int -> string
+val name2index: info -> context -> string -> int
+val ctxlength: context -> int
+val addname: context -> string -> context
 
 (* Printing *)
 val printtm: context -> term -> unit

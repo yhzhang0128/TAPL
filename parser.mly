@@ -31,6 +31,8 @@ open Syntax
 %token <Support.Error.info> PRED
 %token <Support.Error.info> ISZERO
 
+%token <Support.Error.info> LAMBDA
+
 /* Identifier and constant value tokens */
 %token <string Support.Error.withinfo> UCID  /* uppercase-initial */
 %token <string Support.Error.withinfo> LCID  /* lowercase/symbolic-initial */
@@ -83,8 +85,14 @@ open Syntax
    Syntax.command list.
 */
 
+/*
 %start toplevel
 %type < Syntax.command list > toplevel
+%%
+*/
+
+%start toplevel
+%type < Syntax.context ->  (Syntax.command list * Syntax.context) > toplevel
 %%
 
 /* ---------------------------------------------------------------------- */
@@ -94,43 +102,57 @@ open Syntax
    by a semicolon. */
 toplevel :
     EOF
-      { [] }
+      { fun ctx -> [], ctx }
   | Command SEMI toplevel
-      { let cmd = $1 in
-          let cmds = $3 in
-          cmd::cmds }
+      { fun ctx ->
+          let cmd,ctx = $1 ctx in
+          let cmds,ctx = $3 ctx in
+          cmd::cmds, ctx }
 
 /* A top-level command */
 Command :
   | Term 
-      { (let t = $1 in Eval(tmInfo t,t)) }
+      { fun ctx -> (let t = $1 ctx in Eval(tmInfo t,t)), ctx }
 
 Term :
     AppTerm
       { $1 }
   | IF Term THEN Term ELSE Term
-      { TmIf($1, $2, $4, $6) }
+      { fun ctx -> TmIf($1, $2 ctx, $4 ctx, $6 ctx) }
+  | LAMBDA LCID DOT Term
+      { fun ctx ->
+          let ctx1 = addname ctx $2.v in
+          TmAbs($1, $2.v, $4 ctx1) }          
 
 AppTerm :
     ATerm
       { $1 }
+  | AppTerm ATerm
+      { fun ctx ->
+          let e1 = $1 ctx in
+          let e2 = $2 ctx in
+          TmApp(tmInfo e1, e1, e2) }
   | SUCC ATerm
-      { TmSucc($1, $2) }
+      { fun ctx -> TmSucc($1, $2 ctx) }
   | PRED ATerm
-      { TmPred($1, $2) }
+      { fun ctx -> TmPred($1, $2 ctx) }
   | ISZERO ATerm
-      { TmIsZero($1, $2) }
+      { fun ctx -> TmIsZero($1, $2 ctx) }
 
 /* Atomic terms are ones that never require extra parentheses */
 ATerm :
     LPAREN Term RPAREN  
       { $2 } 
+  | LCID
+      { fun ctx -> 
+          TmVar($1.i, name2index $1.i ctx $1.v, ctxlength ctx) }
   | TRUE
-      { TmTrue($1) }
+      { fun ctx -> TmTrue($1) }
   | FALSE
-      { TmFalse($1) }
+      { fun ctx -> TmFalse($1) }
   | INTV
-      { let rec f n = match n with
+      { fun ctx ->
+          let rec f n = match n with
               0 -> TmZero($1.i)
             | n -> TmSucc($1.i, f (n-1))
           in f $1.v }
