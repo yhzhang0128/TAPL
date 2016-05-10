@@ -5,6 +5,18 @@ open Support.Pervasive
 
 (* ------------------------   EVALUATION  ------------------------ *)
 
+let prTermType t = match t with
+    TmTrue(fi) -> pr "Term True\n"
+  | TmFalse(fi) -> pr "Term False\n"
+  | TmIf(fi,_,_,_) -> pr "Term If\n"
+  | TmZero(fi) -> pr "Term Zero\n"
+  | TmSucc(fi,_) -> pr "Term Succ\n"
+  | TmPred(fi,_) -> pr "Term Pred\n"
+  | TmIsZero(fi,_) -> pr "Term IsZero\n"
+  | TmVar(fi,_,_) -> pr "Term Var\n"
+  | TmAbs(fi,_,_) -> pr "Term Abs\n"
+  | TmApp(fi,_,_) -> pr "Term App\n"
+
 exception NoRuleApplies
 
 let rec isnumericval t = match t with
@@ -46,7 +58,8 @@ let rec eval1 ctx t = match t with
       TmIsZero(fi, t1')
   (* Lambda evaluation, call-by-value *)
     (* abs val *)
-  | TmApp(fi, TmAbs(_,x,t12), v2) when (isval ctx v2) -> termSubstTop v2 t12
+  | TmApp(fi, TmAbs(_,x,t12), v2) when (isval ctx v2) -> 
+      termSubstTop v2 t12
     (* val term *)
   | TmApp(fi, v1, t2) when (isval ctx v1) ->
     let t2' = eval1 ctx t2 in

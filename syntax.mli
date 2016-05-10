@@ -33,8 +33,7 @@ val addname: context -> string -> context
 
 (* Printing *)
 val printtm: context -> term -> unit
-val printtm_ATerm: bool -> term -> unit
-val printtm_Lambda: context -> term -> unit
+val printtm_ATerm: bool -> context -> term -> unit
 
 (* Lambda syntax *)
 val termShift: int -> term -> term

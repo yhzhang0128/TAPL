@@ -70,6 +70,7 @@ let tmInfo t = match t with
   | TmAbs(fi,_,_) -> fi
   | TmApp(fi,_,_) -> fi
 
+
 (* ---------------------------------------------------------------------- *)
 (* Printing *)
 
@@ -91,28 +92,30 @@ let obox() = open_hvbox 2
 let cbox() = close_box()
 let break() = print_break 0 0
 
-let rec printtm_Term outer t = match t with
+let rec printtm_Term outer ctx t = match t with
     TmIf(fi, t1, t2, t3) ->
        obox0();
        pr "if ";
-       printtm_Term false t1;
+       printtm_Term false ctx t1;
        print_space();
        pr "then ";
-       printtm_Term false t2;
+       printtm_Term false ctx t2;
        print_space();
        pr "else ";
-       printtm_Term false t3;
+       printtm_Term false ctx t3;
        cbox()
-  | t -> printtm_AppTerm outer t
+  | t -> printtm_AppTerm outer ctx t
 
-and printtm_AppTerm outer t = match t with
+and printtm_AppTerm outer ctx t = match t with
     TmPred(_,t1) ->
-       pr "pred "; printtm_ATerm false t1
+       pr "pred "; printtm_ATerm false ctx t1
   | TmIsZero(_,t1) ->
-       pr "iszero "; printtm_ATerm false t1
-  | t -> printtm_ATerm outer t
+       pr "iszero "; printtm_ATerm false ctx t1
+  | TmApp(_, t1, t2) ->
+      pr "("; printtm_ATerm false ctx t1; pr " "; printtm_ATerm false ctx t2; pr ")";
+  | t -> printtm_ATerm outer ctx t
 
-and printtm_ATerm outer t = match t with
+and printtm_ATerm outer ctx t = match t with
     TmTrue(_) -> pr "true"
   | TmFalse(_) -> pr "false"
   | TmZero(fi) ->
@@ -123,23 +126,23 @@ and printtm_ATerm outer t = match t with
        (* Remark: print number in a friendly way  *)
        | TmSucc(_,s) -> f (n+1) s
        (* Remark: note that here uses t1 so it is correct *)
-       | _ -> (pr "(succ "; printtm_ATerm false t1; pr ")")
+       | _ -> (pr "(succ "; printtm_ATerm false ctx t1; pr ")")
      in f 1 t1
-  | t -> pr "("; printtm_Term outer t; pr ")"
-
-let rec printtm_Lambda ctx t = match t with
-    TmAbs(_, x, t1) ->
+  | TmAbs(_, x, t1) ->
       (* push x into context for printing t1  *)
       let (ctx', x') = pickfreshname ctx x in
-      pr "(lambda "; pr x'; pr ". "; printtm_Lambda ctx' t1; pr ")"
-  | TmApp(_, t1, t2) ->
-      pr "("; printtm_Lambda ctx t1; pr " "; printtm_Lambda ctx t2; pr ")";
+      pr "(lambda "; pr x'; pr ". "; printtm_ATerm false ctx' t1; pr ")"
   | TmVar(fi, x, n) ->
       if ctxlength ctx = n then
         pr (index2name fi ctx x)
       else
-        pr "[bad index]"
-  | _ -> pr "printtm_Lambda: meet non-lambda term"
+        pr "[bad index]";
+  | t -> pr "("; printtm_Term outer ctx t; pr ")"
+
+and printtm ctx t = match t with
+  | _ -> printtm_Term true ctx t 
+
+
 
 let termShift d t =
   let rec walk c t = match t with
@@ -149,6 +152,12 @@ let termShift d t =
                              else TmVar(fi, x, n+d)
   | TmAbs(fi,x,t1) -> TmAbs(fi, x, walk(c+1) t1)
   | TmApp(fi,t1,t2) -> TmApp(fi, walk c t1, walk c t2)
+  | TmIf(fi,t1,t2,t3) -> TmIf(fi, walk c t1, walk c t2, walk c t3)
+  (* Regard succ as an abstraction *)
+  | TmSucc(fi, t1) -> TmSucc(fi, walk c t1)
+  | TmPred(fi, t1) -> TmPred(fi, walk c t1)
+  | TmIsZero(fi, t1) -> TmIsZero(fi, walk c t1)
+  | _ -> t
   in walk 0 t
 
 (* [j -> s] t *)
@@ -156,16 +165,14 @@ let termSubst j s t =
   let rec walk c t = match t with
     TmVar(fi,x,n) -> if x=j+c then termShift c s else TmVar(fi,x,n)
   | TmAbs(fi,x,t1) -> TmAbs(fi, x, walk (c+1) t1)
-  | TmApp(fi,t1,t2) -> TmApp(fi, walk c t1, walk c t2)
+  | TmApp(fi,t1,t2) -> TmApp(fi, walk c t1, walk c t2)  
+  | TmIf(fi,t1,t2,t3) -> TmIf(fi, walk c t1, walk c t2, walk c t3)
+  (* Regard succ as an abstraction *)
+  | TmSucc(fi, t1) -> TmSucc(fi, walk c t1)
+  | TmPred(fi, t1) -> TmPred(fi, walk c t1)
+  | TmIsZero(fi, t1) -> TmIsZero(fi, walk c t1)
+  | _ -> t
   in walk 0 t
 
 let termSubstTop s t =
   termShift (-1) (termSubst 0 (termShift 1 s) t)
-
-let printtm ctx t = match t with
-    TmVar(_,_,_) -> printtm_Lambda ctx t
-  | TmApp(_,_,_) -> printtm_Lambda ctx t
-  | TmAbs(_,_,_) -> printtm_Lambda ctx t
-  | _ -> printtm_Term true t 
-
-
