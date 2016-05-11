@@ -32,6 +32,8 @@ open Syntax
 %token <Support.Error.info> ISZERO
 
 %token <Support.Error.info> LAMBDA
+%token <Support.Error.info> TYPEBOOL
+%token <Support.Error.info> TYPENAT
 
 /* Identifier and constant value tokens */
 %token <string Support.Error.withinfo> UCID  /* uppercase-initial */
@@ -109,6 +111,26 @@ toplevel :
           let cmds,ctx = $3 ctx in
           cmd::cmds, ctx }
 
+
+/* Type Meta Variables */
+AType :
+    LPAREN Type RPAREN
+      { $2 }
+  | TYPEBOOL
+      { fun ctx -> TyBool }
+  | TYPENAT
+      { fun ctx -> TyNat }
+
+ArrowType :
+  AType ARROW AType
+    { fun ctx -> TyArrow($1 ctx, $3 ctx) }
+
+Type :
+    ArrowType
+      { $1 }
+  | AType
+      { $1 }
+
 /* A top-level command */
 Command :
   | Term 
@@ -119,10 +141,10 @@ Term :
       { $1 }
   | IF Term THEN Term ELSE Term
       { fun ctx -> TmIf($1, $2 ctx, $4 ctx, $6 ctx) }
-  | LAMBDA LCID DOT Term
+  | LAMBDA LCID COLON Type DOT Term
       { fun ctx ->
           let ctx1 = addname ctx $2.v in
-          TmAbs($1, $2.v, $4 ctx1) }          
+          TmAbs($1, $2.v, $4 ctx1, $6 ctx1) }
 
 AppTerm :
     ATerm
