@@ -99,6 +99,25 @@ let rec eval ctx t =
       in eval ctx t'
   with NoRuleApplies -> t
 
+
+
+let rec subtype tyS tyT =
+  (=) tyS tyT ||
+  match (tyS, tyT) with
+   (* for every field in T, the corresponding field in S is corresponding subtype *)
+      (TyRecord(fS), TyRecord(fT)) ->
+        List.for_all
+          (fun (li, tyTi) ->
+             try let tySi = List.assoc li fS in
+               subtype tySi tyTi
+             with Not_found -> false)
+         fT
+    | (_, TyTop) -> true
+    | (TyArrow(tyS1, tyS2), TyArrow(tyT1, tyT2)) ->
+      (subtype tyT1 tyS1) && (subtype tyS2 tyT2)
+    | (_,_) -> false
+
+
 let rec typeof ctx t =
   match t with
   (* Lambda Expression *)
@@ -112,9 +131,23 @@ let rec typeof ctx t =
      let tyT_arg = typeof ctx t2 in
      (match tyT_func with
        TyArrow(tyT_left, tyT_right) ->
-         if (=) tyT_arg tyT_left then tyT_right
+     (* modified here for subtyping *)
+         if subtype tyT_arg tyT_left then tyT_right
          else error fi "parameter type mismatch in TmApp"
      | _ -> error fi "arrow type expected in TmApp")
+
+  (* Record *)
+  | TmRecord(fi, fields) ->
+    let fieldtys = 
+      List.map (fun (li,ti) -> (li, typeof ctx ti)) fields in
+    TyRecord(fieldtys)
+  | TmProj(fi, t1, l) ->
+    (match (typeof ctx t1) with
+         TyRecord(fieldtys) ->
+           (try List.assoc l fieldtys
+            with Not_found -> error fi ("label" ^ l ^ " not found" )
+           )
+      | _ -> error fi "Expected record type in projection")
 
   (* Build-in functions *)
   | TmIf(fi,t1,t2,t3) ->

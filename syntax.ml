@@ -210,9 +210,9 @@ and printtm_ATerm outer ctx t = match t with
         | f::rest ->
             pf i f; pr","; if outer then print_space() else break();
             p (i+1) rest
-      in pr "<Record> {"; open_hovbox 0; p 1 fields; pr "}"; cbox()
+      in pr "{"; open_hovbox 0; p 1 fields; pr "}"; cbox()
   | TmProj(_, t1, l) ->
-      pr "<Project>"; printtm_ATerm false ctx t1; pr"."; pr l
+      printtm_ATerm false ctx t1; pr"."; pr l
   | t -> pr "("; printtm_Term outer ctx t; pr ")"
 
 and printtm ctx t = match t with
