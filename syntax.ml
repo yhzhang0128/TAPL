@@ -9,6 +9,9 @@ type ty =
     TyArrow of ty * ty
   | TyBool
   | TyNat
+(* types added for subtyping *)
+  | TyTop
+  | TyRecord of (string * ty) list
 
 type term =
     TmTrue of info
@@ -22,6 +25,9 @@ type term =
   | TmVar of info * int * int
   | TmAbs of info * string * ty * term
   | TmApp of info * term * term
+(* New term definition for subtyping *)
+  | TmRecord of info * (string * term) list
+  | TmProj of info * term * string
 
 
 type command =
@@ -89,10 +95,13 @@ let tmInfo t = match t with
   | TmVar(fi,_,_) -> fi
   | TmAbs(fi,_,_,_) -> fi
   | TmApp(fi,_,_) -> fi
+  | TmRecord(fi,_) -> fi
+  | TmProj(fi,_,_) -> fi
 
 
 (* ---------------------------------------------------------------------- *)
 (* Printing *)
+(* Printing Types *)
 
 (* The printing functions call these utility functions to insert grouping
   information and line-breaking hints for the pretty-printing library:
@@ -111,6 +120,40 @@ let obox0() = open_hvbox 0
 let obox() = open_hvbox 2
 let cbox() = close_box()
 let break() = print_break 0 0
+
+
+let rec printty_Type outer tyT = match tyT with
+  tyT -> printty_ArrowType outer tyT
+
+and printty_ArrowType outer tyT = match tyT with
+  TyArrow(tyT_left, tyT_right) ->
+    obox0();
+    printty_AType false tyT_left;
+    if outer then pr " ";
+    pr "->";
+    if outer then pr " ";
+    printty_ArrowType outer tyT_right;
+    cbox()
+  | tyT -> printty_AType outer tyT
+
+and printty_AType outer tyT = match tyT with
+    TyBool -> pr "Bool"
+  | TyNat -> pr "Nat"
+  | TyTop -> pr "Top"
+  | TyRecord(fields) -> 
+      let pf i (li, tyTi) =
+        if (li <> (string_of_int i)) then (pr li; pr ":");
+        printty_Type false tyTi
+      in let rec p i l = match l with
+          [] -> ()
+        | [f] -> pf i f
+        | f::rest ->
+            pf i f; pr","; if outer then print_space() else break();
+            p (i+1) rest
+      in pr "{"; open_hovbox 0; p 1 fields; pr "}"; cbox()
+  | tyT -> pr "("; printty_Type outer tyT; pr ")"
+
+let printty tyT = printty_Type true tyT
 
 let rec printtm_Term outer ctx t = match t with
     TmIf(fi, t1, t2, t3) ->
@@ -148,43 +191,32 @@ and printtm_ATerm outer ctx t = match t with
        (* Remark: note that here uses t1 so it is correct *)
        | _ -> (pr "(succ "; printtm_ATerm false ctx t1; pr ")")
      in f 1 t1
-  | TmAbs(_, x, _, t1) ->
+  | TmAbs(_, x, ty, t1) ->
       (* push x into context for printing t1  *)
       let (ctx', x') = pickfreshname ctx x in
-      pr "(lambda "; pr x'; pr ". "; printtm_ATerm false ctx' t1; pr ")"
+      pr "(lambda "; pr x'; pr": "; printty ty; pr ". "; printtm_ATerm false ctx' t1; pr ")"
   | TmVar(fi, x, n) ->
       if ctxlength ctx = n then
         pr (index2name fi ctx x)
       else
         pr "[bad index]";
+  | TmRecord(fi, fields) ->
+      let pf i (li, ti) =
+        if (li <> (string_of_int i)) then (pr li; pr "=");
+        printtm_Term false ctx ti 
+      in let rec p i l = match l with
+          [] -> ()
+        | [f] -> pf i f
+        | f::rest ->
+            pf i f; pr","; if outer then print_space() else break();
+            p (i+1) rest
+      in pr "<Record> {"; open_hovbox 0; p 1 fields; pr "}"; cbox()
+  | TmProj(_, t1, l) ->
+      pr "<Project>"; printtm_ATerm false ctx t1; pr"."; pr l
   | t -> pr "("; printtm_Term outer ctx t; pr ")"
 
 and printtm ctx t = match t with
   | _ -> printtm_Term true ctx t 
-
-
-
-(* Printing Types *)
-let rec printty_Type outer tyT = match tyT with
-  tyT -> printty_ArrowType outer tyT
-
-and printty_ArrowType outer tyT = match tyT with
-  TyArrow(tyT_left, tyT_right) ->
-    obox0();
-    printty_AType false tyT_left;
-    if outer then pr " ";
-    pr "->";
-    if outer then pr " ";
-    printty_ArrowType outer tyT_right;
-    cbox()
-  | tyT -> printty_AType outer tyT
-
-and printty_AType outer tyT = match tyT with
-    TyBool -> pr "Bool"
-  | TyNat -> pr "Nat"
-  | tyT -> pr "("; printty_Type outer tyT; pr ")"
-
-let printty tyT = printty_Type true tyT
 
 (* ---------------------------------------------------------------------- *)
 (* Substitution for evaluation *)
@@ -202,6 +234,8 @@ let termShift d t =
   | TmSucc(fi, t1) -> TmSucc(fi, walk c t1)
   | TmPred(fi, t1) -> TmPred(fi, walk c t1)
   | TmIsZero(fi, t1) -> TmIsZero(fi, walk c t1)
+  | TmRecord(fi, fields) -> TmRecord(fi, List.map(fun (li,ti) -> (li, walk c ti)) fields)
+  | TmProj(fi, t1, l) -> TmProj(fi, walk c t1, l)
   | _ -> t
   in walk 0 t
 
@@ -216,6 +250,8 @@ let termSubst j s t =
   | TmSucc(fi, t1) -> TmSucc(fi, walk c t1)
   | TmPred(fi, t1) -> TmPred(fi, walk c t1)
   | TmIsZero(fi, t1) -> TmIsZero(fi, walk c t1)
+  | TmRecord(fi, fields) -> TmRecord(fi, List.map(fun (li,ti) -> (li, walk c ti)) fields)
+  | TmProj(fi, t1, l) -> TmProj(fi, walk c t1, l)
   | _ -> t
   in walk 0 t
 

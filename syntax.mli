@@ -7,8 +7,10 @@ type ty =
     TyArrow of ty * ty
   | TyBool
   | TyNat
+(* types added for subtyping *)
+  | TyTop
+  | TyRecord of (string * ty) list
 
-(* Data type definitions *)
 type term =
     TmTrue of info
   | TmFalse of info
@@ -21,7 +23,9 @@ type term =
   | TmVar of info * int * int
   | TmAbs of info * string * ty * term
   | TmApp of info * term * term
-
+(* New term definition for subtyping *)
+  | TmRecord of info * (string * term) list
+  | TmProj of info * term * string
 
 type command =
   | Eval of info * term

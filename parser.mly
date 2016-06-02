@@ -35,6 +35,8 @@ open Syntax
 %token <Support.Error.info> TYPEBOOL
 %token <Support.Error.info> TYPENAT
 
+%token <Support.Error.info> TYPETOP
+
 /* Identifier and constant value tokens */
 %token <string Support.Error.withinfo> UCID  /* uppercase-initial */
 %token <string Support.Error.withinfo> LCID  /* lowercase/symbolic-initial */
@@ -120,6 +122,28 @@ AType :
       { fun ctx -> TyBool }
   | TYPENAT
       { fun ctx -> TyNat }
+  | TYPETOP
+      { fun ctx -> TyTop }
+  | LCURLY FieldTypes RCURLY
+      { fun ctx -> TyRecord($2 ctx 1) }
+
+FieldTypes :
+  /* empty */
+    { fun ctx i -> [] }
+  | NEFieldTypes
+    { $1 }
+
+NEFieldTypes :
+    FieldType
+      { fun ctx i -> [$1 ctx i] }
+  | FieldType COMMA NEFieldTypes
+      { fun ctx i -> ($1 ctx i) :: ($3 ctx (i + 1)) }
+
+FieldType :
+    LCID COLON Type
+      { fun ctx i -> ($1.v, $3 ctx) }
+  | Type
+      { fun ctx i -> (string_of_int i, $1 ctx) }
 
 ArrowType :
   AType ARROW AType
@@ -178,6 +202,33 @@ ATerm :
               0 -> TmZero($1.i)
             | n -> TmSucc($1.i, f (n-1))
           in f $1.v }
+
+  /* Added for subtyping */
+  | ATerm DOT LCID
+      { fun ctx -> TmProj($2, $1 ctx, $3.v) }
+  | ATerm DOT INTV
+      { fun ctx -> TmProj($2, $1 ctx, string_of_int $3.v) }
+
+  | LCURLY Fields RCURLY
+      { fun ctx -> TmRecord($1, $2 ctx 1) }
+
+Fields :
+    /* empty */
+      { fun ctx i -> [] }
+  | NEFields
+      { $1 }
+
+NEFields :
+    Field
+      { fun ctx i -> [$1 ctx i] }
+  | Field COMMA NEFields
+      { fun ctx i -> ($1 ctx i) :: ($3 ctx (i+1)) }
+
+Field :
+    LCID EQ Term
+      { fun ctx i -> ($1.v, $3 ctx) }
+  | Term
+      { fun ctx i -> (string_of_int i, $1 ctx) }
 
 
 /*   */

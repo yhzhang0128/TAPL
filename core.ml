@@ -16,6 +16,8 @@ let prTermType t = match t with
   | TmVar(fi,_,_) -> pr "Term Var\n"
   | TmAbs(fi,_,_,_) -> pr "Term Abs\n"
   | TmApp(fi,_,_) -> pr "Term App\n"
+  | TmRecord(fi,_) -> pr "Term Record\n"
+  | TmProj(fi,_,_) -> pr "Term Project\n"
 
 exception NoRuleApplies
 
@@ -29,6 +31,7 @@ let rec isval ctx t = match t with
   | TmFalse(_) -> true
   | TmAbs(_,_,_,_) -> true
   | t when isnumericval t  -> true
+  | TmRecord(_,fields) -> List.for_all (fun (l,ti) -> isval ctx ti) fields
   | _ -> false
 
 let rec eval1 ctx t = match t with
@@ -59,7 +62,8 @@ let rec eval1 ctx t = match t with
   (* Lambda evaluation, call-by-value *)
     (* abs val *)
   | TmApp(fi, TmAbs(_,x,_,t12), v2) when (isval ctx v2) -> 
-      termSubstTop v2 t12
+      let rett = termSubstTop v2 t12 in
+        rett
     (* val term *)
   | TmApp(fi, v1, t2) when (isval ctx v1) ->
     let t2' = eval1 ctx t2 in
@@ -69,6 +73,24 @@ let rec eval1 ctx t = match t with
     let t1' = eval1 ctx t1 in
       TmApp(fi, t1', t2)
 
+  (* Record evaluation *)
+  | TmRecord(fi, fields) ->
+      let rec evalafield l = match l with
+        [] -> raise NoRuleApplies
+      | (l, vi)::rest when isval ctx vi ->
+        let rest' = evalafield rest in
+          (l,vi)::rest'
+      | (l,ti)::rest ->
+          let ti' = eval1 ctx ti in
+            (l, ti')::rest
+      in let fields' = evalafield fields in
+        TmRecord(fi, fields')
+  | TmProj(fi, (TmRecord(_, fields) as v1), l) when isval ctx v1 ->
+      (try List.assoc l fields
+       with Not_found -> raise NoRuleApplies)
+  | TmProj(fi, t1, l) ->
+      let t1' = eval1 ctx t1 in
+        TmProj(fi, t1', l)
   | _ -> 
       raise NoRuleApplies
 

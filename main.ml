@@ -52,11 +52,11 @@ let alreadyImported = ref ([] : string list)
 
 let rec process_command ctx cmd = match cmd with
   | Eval(fi,t) -> 
-      let tyT = typeof ctx t in
+(*      let tyT = typeof ctx t in*)
       let t' = eval ctx t in
       printtm ctx t'; 
       pr " : ";
-      printty tyT;
+(*      printty tyT;*)
       force_newline();
       initialContext
   

@@ -24,6 +24,7 @@ let reservedWords = [
 
   ("Bool", fun i -> Parser.TYPEBOOL i);
   ("Nat", fun i -> Parser.TYPENAT i);
+  ("Top", fun i -> Parser.TYPETOP i);
   
   (* Symbols *)
   ("_", fun i -> Parser.USCORE i);
